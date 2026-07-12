@@ -480,8 +480,17 @@
         <button class="btn-primary" id="addNoteBtn">
           <i class="fa-solid fa-plus"></i> 新增筆記
         </button>
+        <button class="add-cat-btn" id="exportDataBtn" title="匯出備份" style="padding:8px 12px;">
+          <i class="fa-solid fa-download"></i>
+        </button>
+        <button class="add-cat-btn" id="importDataBtn" title="匯入備份" style="padding:8px 12px;">
+          <i class="fa-solid fa-upload"></i>
+        </button>
       </div>
     </div>
+
+    <!-- ===== 隱藏檔案輸入（供匯入用） ===== -->
+    <input type="file" id="importFileInput" accept=".json" style="display:none" />
 
     <!-- ===== 類別管理面板 ===== -->
     <div class="cat-manage" id="catManagePanel">
@@ -495,6 +504,7 @@
 
     <!-- ===== 統計 ===== -->
     <div class="stats" id="statsBar">共 0 則筆記</div>
+    <div class="stats" id="debugBar" style="font-size:11px;color:var(--text3);margin-top:-8px;margin-bottom:8px"></div>
 
     <!-- ===== 筆記網格 ===== -->
     <div class="grid" id="noteGrid"></div>
@@ -653,6 +663,19 @@
       ).join('');
     }
 
+    /** 更新除錯狀態欄 */
+    function updateDebugBar() {
+      const notes = loadNotes();
+      const db = $('debugBar');
+      try {
+        const size = new Blob([JSON.stringify(notes)]).size;
+        const kb = (size / 1024).toFixed(1);
+        db.textContent = `💾 ${notes.length} 則 · ${kb}KB (localStorage)`;
+      } catch {
+        db.textContent = `💾 ${notes.length} 則`;
+      }
+    }
+
     /** 渲染筆記網格 */
     function renderNotes() {
       const notes = loadNotes();
@@ -675,6 +698,7 @@
 
       // 統計
       stats.textContent = `共 ${filtered.length} 則筆記${currentFilter !== '全部' ? `（${currentFilter}）` : ''}`;
+      updateDebugBar();
 
       if (filtered.length === 0) {
         grid.innerHTML = `<div class="grid-empty">
@@ -711,9 +735,8 @@
       return div.innerHTML;
     }
 
-    /** 根據類別名稱回傳不同的標籤顏色 */
+    /** 根據類別名稱回傳不同的標籤顏色（🔒 安全：未知類別用預設色） */
     function getCatColor(cat, cats) {
-      const idx = cats.indexOf(cat);
       const palette = [
         { bg: '#e3f2fd', fg: '#1565c0' },
         { bg: '#e8f5e9', fg: '#2e7d32' },
@@ -724,7 +747,22 @@
         { bg: '#fff8e1', fg: '#f9a825' },
         { bg: '#efebe9', fg: '#4e342e' },
       ];
-      return palette[idx % palette.length];
+      // ⚠️ JS 中 -1 % 8 = -1，不能用負索引
+      const idx = cats.indexOf(cat);
+      const safeIdx = (idx < 0) ? 0 : (idx % palette.length);
+      return palette[safeIdx];
+    }
+
+    /** 除錯：檢查 localStorage 資料完整性 */
+    function debugData() {
+      const notes = loadNotes();
+      const cats = loadCategories();
+      const dark = localStorage.getItem('multinotes_dark');
+      console.log(`📝 筆記本狀態：${notes.length} 則筆記, ${cats.length} 個類別, 夜間模式=${dark}`);
+      if (notes.length > 0) {
+        console.log('📋 筆記列表：', notes.map(n => ({ id: n.id, title: n.title, cat: n.category })));
+      }
+      return { noteCount: notes.length, catCount: cats.length };
     }
 
     // ============================================================
@@ -800,6 +838,8 @@
 
       closeModal();
       renderNotes();
+      updateDebugBar();
+      console.log(`💾 儲存成功 · localStorage 共 ${loadNotes().length} 則`);
     }
 
     /** 刪除筆記（含確認） */
@@ -809,6 +849,7 @@
       notes = notes.filter(n => n.id !== id);
       saveNotes(notes);
       renderNotes();
+      updateDebugBar();
       showToast('🗑️ 筆記已刪除');
     }
 
@@ -857,11 +898,56 @@
       if (currentFilter === name) currentFilter = '全部';
       renderCategories();
       renderNotes();
+      updateDebugBar();
       showToast('🗑️ 類別已刪除');
     }
 
     // ============================================================
-    //  七、事件綁定（委派）
+    //  七、匯出／匯入
+    // ============================================================
+
+    function exportData() {
+      const notes = loadNotes();
+      const cats = loadCategories();
+      const data = { notes, cats, exportedAt: nowStr(), version: 1 };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      a.download = `筆記本備份_${ts}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('📤 資料已匯出');
+    }
+
+    function importData(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!data.notes || !Array.isArray(data.notes)) {
+            showToast('⚠️ 格式錯誤：缺少筆記資料');
+            return;
+          }
+          const count = data.notes.length;
+          saveNotes(data.notes);
+          if (data.cats && Array.isArray(data.cats)) {
+            saveCategories(data.cats);
+          }
+          showToast(`📥 已匯入 ${count} 則筆記`);
+          renderCategories();
+          renderNotes();
+        } catch(err) {
+          showToast('⚠️ 匯入失敗：檔案格式錯誤');
+          console.error('匯入錯誤:', err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ============================================================
+    //  八、事件綁定（委派）
     // ============================================================
 
     // 主題切換
@@ -869,6 +955,16 @@
 
     // 新增筆記
     $('addNoteBtn').addEventListener('click', openAddModal);
+
+    // 匯出 / 匯入
+    $('exportDataBtn').addEventListener('click', exportData);
+    $('importDataBtn').addEventListener('click', () => $('importFileInput').click());
+    $('importFileInput').addEventListener('change', function(e) {
+      if (this.files && this.files[0]) {
+        importData(this.files[0]);
+      }
+      this.value = ''; // 清空以便重複選同檔
+    });
 
     // 類別面板開關
     $('manageCatBtn').addEventListener('click', toggleCatPanel);
@@ -941,6 +1037,8 @@
     initTheme();
     renderCategories();
     renderNotes();
+    updateDebugBar();
+    const initState = debugData();
 
     // Ctrl+N 快速新增
     document.addEventListener('keydown', e => {
