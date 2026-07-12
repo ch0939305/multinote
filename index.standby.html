@@ -460,27 +460,8 @@
       <button class="theme-toggle" id="themeToggle" title="切換日夜模式">
         <i class="fa-solid fa-moon"></i> <span>夜間</span>
       </button>
-      <button class="theme-toggle" id="backendConfigBtn" title="後端設定" style="padding:8px 12px;font-size:13px">
-        <i class="fa-solid fa-server"></i>
-      </button>
     </div>
   </header>
-  
-  <!-- ===== 後端設定 Modal（簡易 prompt） ===== -->
-  <div class="modal-overlay" id="backendModal">
-    <div class="modal">
-      <h2>🔗 後端連線設定</h2>
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
-        輸入後端 API 網址（含 /api），留空 = 使用本機儲存
-      </p>
-      <label for="backendUrlInput">API 網址</label>
-      <input type="url" id="backendUrlInput" placeholder="http://localhost:3000/api" value="" />
-      <div class="modal-actions">
-        <button class="btn-cancel" id="backendCancelBtn">取消</button>
-        <button class="btn-save" id="backendSaveBtn">套用</button>
-      </div>
-    </div>
-  </div>
 
   <div class="container">
     <!-- ===== 工具列 ===== -->
@@ -554,45 +535,6 @@
 
   <script>
     // ============================================================
-    //  後端連線設定（填 URL 即啟用 API 模式）
-    // ============================================================
-    // 範例：const API_BASE = 'http://localhost:3000/api';
-    //       或 'https://notebook-api.railway.app/api'
-    const API_BASE = localStorage.getItem('multinote_api_url') || '';
-
-    function isBackendMode() { return API_BASE.length > 5; }
-
-    function getBackendUrl() { return API_BASE; }
-
-    // 非同步 API 呼叫封裝
-    async function apiFetch(method, path, body) {
-      const opts = { method, headers: { 'Content-Type': 'application/json' } };
-      if (body) opts.body = JSON.stringify(body);
-      const res = await fetch(API_BASE + path, opts);
-      if (!res.ok) throw new Error(`API 錯誤 ${res.status}`);
-      return res.json();
-    }
-
-    // ─── 後端資料操作 ───
-    let _backNotes = [];
-    let _backCats = [];
-
-    async function backLoadAll() {
-      if (!isBackendMode()) return;
-      try {
-        const [notes, cats] = await Promise.all([
-          apiFetch('GET', '/notes'),
-          apiFetch('GET', '/categories'),
-        ]);
-        _backNotes = notes;
-        _backCats = cats;
-        console.log(`🌐 已從後端載入 ${notes.length} 則筆記`);
-      } catch (e) {
-        console.warn('⚠️ 無法連線後端，降級為本機模式', e);
-      }
-    }
-
-    // ============================================================    
     //  一、資料層：IndexedDB 為主 + localStorage 備援
     // ============================================================
     // 為什麼用 IndexedDB：關閉瀏覽器後 localStorage 可能被清除
@@ -695,41 +637,16 @@
     // ─── 筆記 CRUD ───
 
     function loadNotes() {
-      // 後端模式：從記憶體快取讀
-      if (isBackendMode()) return [..._backNotes];
-      // 本機模式：從 IndexedDB 快取讀
       return [..._cache.notes];
     }
 
-    async function saveNotes(notes) {
-      if (isBackendMode()) {
-        // 後端模式：全部取代（先刪後建）
-        // 實際使用時建議逐筆 CRUD，這裡先保留既有邏輯
-        _backNotes = [...notes];
-        return;
-      }
+    function saveNotes(notes) {
       _cache.notes = [...notes];
+      // 同時寫入 IndexedDB 和 localStorage
       dbClear(STORE_NOTES).then(() => dbPut(STORE_NOTES, null, notes)).catch(() => {});
-      try { localStorage.setItem('multinotes', JSON.stringify(notes)); } catch {}
-    }
-
-    // ─── 後端模式專用：單筆 CRUD ───
-    async function backAddNote(note) {
-      const saved = await apiFetch('POST', '/notes', note);
-      _backNotes.push(saved);
-      return saved;
-    }
-
-    async function backUpdateNote(id, updates) {
-      const saved = await apiFetch('PUT', `/notes/${id}`, updates);
-      const idx = _backNotes.findIndex(n => n.id === id);
-      if (idx !== -1) _backNotes[idx] = saved;
-      return saved;
-    }
-
-    async function backDeleteNote(id) {
-      await apiFetch('DELETE', `/notes/${id}`);
-      _backNotes = _backNotes.filter(n => n.id !== id);
+      try {
+        localStorage.setItem('multinotes', JSON.stringify(notes));
+      } catch {}
     }
 
     /** 產生短 UID (8 碼十六進位) */
@@ -747,32 +664,15 @@
     const DEFAULT_CATS = ['日常', '電腦', 'AI'];
 
     function loadCategories() {
-      if (isBackendMode()) return [..._backCats];
       return [..._cache.cats];
     }
 
     function saveCategories(cats) {
-      if (isBackendMode()) { _backCats = [...cats]; return; }
       _cache.cats = [...cats];
       dbPut(STORE_META, 'cats', cats).catch(() => {});
-      try { localStorage.setItem('multinotes_cats', JSON.stringify(cats)); } catch {}
-    }
-
-    async function backAddCategory(name) {
-      await apiFetch('POST', '/categories', { name });
-      _backCats.push(name);
-    }
-
-    async function backDeleteCategory(name) {
-      // 重新分配筆記類別
-      const other = _backCats.find(c => c !== name);
-      if (other) {
-        _backNotes.forEach(n => {
-          if (n.category === name) n.category = other;
-        });
-      }
-      await apiFetch('DELETE', `/categories/${encodeURIComponent(name)}`);
-      _backCats = _backCats.filter(c => c !== name);
+      try {
+        localStorage.setItem('multinotes_cats', JSON.stringify(cats));
+      } catch {}
     }
 
     // ─── 主題設定 ───
@@ -784,7 +684,9 @@
     function saveTheme(dark) {
       _cache.dark = dark;
       dbPut(STORE_META, 'dark', dark).catch(() => {});
-      try { localStorage.setItem('multinotes_dark', dark ? 'true' : 'false'); } catch {}
+      try {
+        localStorage.setItem('multinotes_dark', dark ? 'true' : 'false');
+      } catch {}
     }
 
     // ─── 啟動時從 IndexedDB / localStorage 載入快取 ───
@@ -921,15 +823,12 @@
     function updateDebugBar() {
       const notes = loadNotes();
       const db = $('debugBar');
-      const modeText = isBackendMode()
-        ? `🌐 後端模式 (${API_BASE})`
-        : '💻 本機模式';
       try {
         const size = new Blob([JSON.stringify(notes)]).size;
         const kb = (size / 1024).toFixed(1);
-        db.textContent = `💾 ${notes.length} 則 · ${kb}KB · ${modeText}`;
+        db.textContent = `💾 ${notes.length} 則 · ${kb}KB (localStorage)`;
       } catch {
-        db.textContent = `💾 ${notes.length} 則 · ${modeText}`;
+        db.textContent = `💾 ${notes.length} 則`;
       }
     }
 
@@ -1058,34 +957,15 @@
     }
 
     /** 儲存筆記（新增或更新） */
-    async function saveNote() {
+    function saveNote() {
       const title = noteTitle.value.trim() || '無標題';
       const category = noteCategory.value;
       const content = noteContent.value.trim();
 
-      if (isBackendMode()) {
-        try {
-          if (editingId) {
-            await backUpdateNote(editingId, { title, content, category });
-            showToast('✅ 筆記已更新');
-          } else {
-            await backAddNote({ title, content, category });
-            showToast('✅ 筆記已新增');
-          }
-        } catch (e) {
-          showToast('⚠️ 儲存失敗：' + e.message);
-          return;
-        }
-        closeModal();
-        renderNotes();
-        updateDebugBar();
-        return;
-      }
-
-      // 本機模式（原邏輯）
       let notes = loadNotes();
 
       if (editingId) {
+        // 更新
         const idx = notes.findIndex(n => n.id === editingId);
         if (idx === -1) { showToast('找不到此筆記'); return; }
         notes[idx] = {
@@ -1098,6 +978,7 @@
         saveNotes(notes);
         showToast('✅ 筆記已更新');
       } else {
+        // 新增
         const note = {
           id: uid(),
           title,
@@ -1114,23 +995,12 @@
       closeModal();
       renderNotes();
       updateDebugBar();
-      console.log(`💾 儲存成功 · 共 ${loadNotes().length} 則`);
+      console.log(`💾 儲存成功 · localStorage 共 ${loadNotes().length} 則`);
     }
 
     /** 刪除筆記（含確認） */
-    async function deleteNote(id) {
+    function deleteNote(id) {
       if (!confirm('確定要刪除這則筆記嗎？')) return;
-      if (isBackendMode()) {
-        try {
-          await backDeleteNote(id);
-          renderNotes();
-          updateDebugBar();
-          showToast('🗑️ 筆記已刪除');
-        } catch (e) {
-          showToast('⚠️ 刪除失敗：' + e.message);
-        }
-        return;
-      }
       let notes = loadNotes();
       notes = notes.filter(n => n.id !== id);
       saveNotes(notes);
@@ -1148,7 +1018,7 @@
       renderCategories();
     }
 
-    async function addCategory(name) {
+    function addCategory(name) {
       name = name.trim();
       if (!name) return;
       let cats = loadCategories();
@@ -1157,33 +1027,19 @@
         return;
       }
       cats.push(name);
-      if (isBackendMode()) {
-        try { await backAddCategory(name); } catch (e) { showToast('⚠️ 新增失敗：' + e.message); return; }
-      } else {
-        saveCategories(cats);
-      }
+      saveCategories(cats);
       renderCategories();
       $('newCatInput').value = '';
       showToast('✅ 類別已新增');
     }
 
-    async function removeCategory(name) {
+    function removeCategory(name) {
       let cats = loadCategories();
       if (cats.length <= 1) {
         showToast('⚠️ 至少需要一個類別');
         return;
       }
-      if (isBackendMode()) {
-        try {
-          await backDeleteCategory(name);
-          renderCategories();
-          renderNotes();
-          updateDebugBar();
-          showToast('🗑️ 類別已刪除');
-        } catch (e) { showToast('⚠️ 刪除失敗：' + e.message); }
-        return;
-      }
-      // 本機模式：將使用此類別的筆記改為第一個類別
+      // 將使用此類別的筆記改為第一個類別
       let notes = loadNotes();
       let changed = false;
       notes.forEach(n => {
@@ -1263,29 +1119,7 @@
       if (this.files && this.files[0]) {
         importData(this.files[0]);
       }
-      this.value = '';
-    });
-
-    // 後端設定
-    $('backendConfigBtn').addEventListener('click', () => {
-      $('backendUrlInput').value = localStorage.getItem('multinote_api_url') || '';
-      $('backendModal').classList.add('open');
-    });
-    $('backendCancelBtn').addEventListener('click', () => $('backendModal').classList.remove('open'));
-    $('backendSaveBtn').addEventListener('click', () => {
-      const url = $('backendUrlInput').value.trim();
-      if (url) {
-        localStorage.setItem('multinote_api_url', url);
-        showToast('✅ 後端網址已設定，請重新整理頁面');
-      } else {
-        localStorage.removeItem('multinote_api_url');
-        showToast('🔄 已切換為本機模式，請重新整理頁面');
-      }
-      $('backendModal').classList.remove('open');
-    });
-    // 點擊 backdrop 關閉
-    $('backendModal').addEventListener('click', e => {
-      if (e.target === $('backendModal')) $('backendModal').classList.remove('open');
+      this.value = ''; // 清空以便重複選同檔
     });
 
     // 類別面板開關
@@ -1356,24 +1190,22 @@
     //  八、啟動
     // ============================================================
 
-    // 非同步啟動：後端模式 → 從 API 載入；本機模式 → IndexedDB
-    const startApp = () => {
+    // 非同步啟動：先載入 IndexedDB / localStorage，再初始化 UI
+    initData().then(() => {
       initTheme();
       renderCategories();
       renderNotes();
       updateDebugBar();
       debugData();
       console.log('🚀 多功能筆記本啟動完畢');
-    };
-
-    if (isBackendMode()) {
-      backLoadAll().then(startApp).catch(startApp);
-    } else {
-      initData().then(startApp).catch(e => {
-        console.error('啟動失敗:', e);
-        startApp();
-      });
-    }
+    }).catch(e => {
+      console.error('啟動失敗:', e);
+      // 緊急降級：用 localStorage
+      initTheme();
+      renderCategories();
+      renderNotes();
+      updateDebugBar();
+    });
 
     // Ctrl+N 快速新增
     document.addEventListener('keydown', e => {
