@@ -535,24 +535,118 @@
 
   <script>
     // ============================================================
-    //  一、資料層：LocalStorage CRUD
+    //  一、資料層：IndexedDB 為主 + localStorage 備援
+    // ============================================================
+    // 為什麼用 IndexedDB：關閉瀏覽器後 localStorage 可能被清除
+    // IndexedDB 跨 session 持久保存，容量更大更可靠
     // ============================================================
 
-    /**
-     * 從 LocalStorage 讀取所有筆記，回傳陣列。
-     * 若無資料則回傳空陣列。
-     */
-    function loadNotes() {
-      try {
-        return JSON.parse(localStorage.getItem('multinotes')) || [];
-      } catch {
-        return [];
-      }
+    const DB_NAME = 'MultinoteDB';
+    const DB_VER = 1;
+    const STORE_NOTES = 'notes';
+    const STORE_META = 'meta';
+
+    /** 記憶體快取（讓 sync API 順暢運作） */
+    let _cache = { notes: [], cats: ['日常', '電腦', 'AI'], dark: false };
+    let _dbReady = false;
+
+    /** 開啟 IndexedDB */
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VER);
+        req.onupgradeneeded = function(e) {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NOTES)) {
+            db.createObjectStore(STORE_NOTES, { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains(STORE_META)) {
+            db.createObjectStore(STORE_META);
+          }
+        };
+        req.onsuccess = function(e) {
+          _dbReady = true;
+          resolve(e.target.result);
+        };
+        req.onerror = function(e) {
+          console.warn('⚠️ IndexedDB 無法開啟，降級使用 localStorage');
+          reject(e.target.error);
+        };
+      });
     }
 
-    /** 將筆記陣列寫回 LocalStorage */
+    /** 寫入 IndexedDB：寫一筆到 objectStore */
+    function dbPut(storeName, key, value) {
+      return new Promise((resolve, reject) => {
+        if (!_dbReady) { reject(new Error('DB not ready')); return; }
+        openDB().then(db => {
+          const tx = db.transaction(storeName, 'readwrite');
+          const store = tx.objectStore(storeName);
+          if (storeName === STORE_NOTES) {
+            // notes store 使用 keyPath，用 put 取代
+            value.forEach(n => store.put(n));
+          } else {
+            store.put(value, key);
+          }
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+        }).catch(reject);
+      });
+    }
+
+    /** 從 IndexedDB 讀取全部資料 */
+    function dbGetAll(storeName) {
+      return new Promise((resolve, reject) => {
+        if (!_dbReady) { reject(new Error('DB not ready')); return; }
+        openDB().then(db => {
+          const tx = db.transaction(storeName, 'readonly');
+          const store = tx.objectStore(storeName);
+          const req = store.getAll();
+          req.onsuccess = () => { db.close(); resolve(req.result); };
+          req.onerror = () => { db.close(); reject(req.error); };
+        }).catch(reject);
+      });
+    }
+
+    /** 從 IndexedDB 讀取單一 key */
+    function dbGet(storeName, key) {
+      return new Promise((resolve, reject) => {
+        if (!_dbReady) { reject(new Error('DB not ready')); return; }
+        openDB().then(db => {
+          const tx = db.transaction(storeName, 'readonly');
+          const store = tx.objectStore(storeName);
+          const req = store.get(key);
+          req.onsuccess = () => { db.close(); resolve(req.result); };
+          req.onerror = () => { db.close(); reject(req.error); };
+        }).catch(reject);
+      });
+    }
+
+    /** 清除 IndexedDB 的某個 store */
+    function dbClear(storeName) {
+      return new Promise((resolve, reject) => {
+        if (!_dbReady) { reject(new Error('DB not ready')); return; }
+        openDB().then(db => {
+          const tx = db.transaction(storeName, 'readwrite');
+          tx.objectStore(storeName).clear();
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+        }).catch(reject);
+      });
+    }
+
+    // ─── 筆記 CRUD ───
+
+    function loadNotes() {
+      return [..._cache.notes];
+    }
+
     function saveNotes(notes) {
-      localStorage.setItem('multinotes', JSON.stringify(notes));
+      _cache.notes = [...notes];
+      // 同時寫入 IndexedDB 和 localStorage
+      dbClear(STORE_NOTES).then(() => dbPut(STORE_NOTES, null, notes)).catch(() => {});
+      try {
+        localStorage.setItem('multinotes', JSON.stringify(notes));
+      } catch {}
     }
 
     /** 產生短 UID (8 碼十六進位) */
@@ -565,30 +659,92 @@
       return new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
     }
 
-    // ============================================================
-    //  二、類別管理
-    // ============================================================
+    // ─── 類別管理 ───
 
     const DEFAULT_CATS = ['日常', '電腦', 'AI'];
 
     function loadCategories() {
-      try {
-        return JSON.parse(localStorage.getItem('multinotes_cats')) || [...DEFAULT_CATS];
-      } catch {
-        return [...DEFAULT_CATS];
-      }
+      return [..._cache.cats];
     }
 
     function saveCategories(cats) {
-      localStorage.setItem('multinotes_cats', JSON.stringify(cats));
+      _cache.cats = [...cats];
+      dbPut(STORE_META, 'cats', cats).catch(() => {});
+      try {
+        localStorage.setItem('multinotes_cats', JSON.stringify(cats));
+      } catch {}
+    }
+
+    // ─── 主題設定 ───
+
+    function loadTheme() {
+      return _cache.dark;
+    }
+
+    function saveTheme(dark) {
+      _cache.dark = dark;
+      dbPut(STORE_META, 'dark', dark).catch(() => {});
+      try {
+        localStorage.setItem('multinotes_dark', dark ? 'true' : 'false');
+      } catch {}
+    }
+
+    // ─── 啟動時從 IndexedDB / localStorage 載入快取 ───
+    async function initData() {
+      try {
+        // 先嘗試從 IndexedDB 讀
+        const [idbNotes, idbCats, idbDark] = await Promise.all([
+          dbGetAll(STORE_NOTES).catch(() => null),
+          dbGet(STORE_META, 'cats').catch(() => null),
+          dbGet(STORE_META, 'dark').catch(() => null),
+        ]);
+
+        if (idbNotes && idbNotes.length > 0) {
+          _cache.notes = idbNotes;
+        } else {
+          // fallback: localStorage
+          const ls = localStorage.getItem('multinotes');
+          if (ls) {
+            try { _cache.notes = JSON.parse(ls) || []; } catch { _cache.notes = []; }
+          }
+        }
+
+        if (idbCats && idbCats.length > 0) {
+          _cache.cats = idbCats;
+        } else {
+          const ls = localStorage.getItem('multinotes_cats');
+          if (ls) {
+            try { _cache.cats = JSON.parse(ls) || [...DEFAULT_CATS]; } catch { _cache.cats = [...DEFAULT_CATS]; }
+          }
+        }
+
+        _cache.dark = idbDark === true || localStorage.getItem('multinotes_dark') === 'true';
+
+        // 同步：把快取寫回兩種儲存
+        try { localStorage.setItem('multinotes', JSON.stringify(_cache.notes)); } catch {}
+        try { localStorage.setItem('multinotes_cats', JSON.stringify(_cache.cats)); } catch {}
+        try { localStorage.setItem('multinotes_dark', _cache.dark ? 'true' : 'false'); } catch {}
+        dbClear(STORE_NOTES).then(() => dbPut(STORE_NOTES, null, _cache.notes)).catch(() => {});
+        dbPut(STORE_META, 'cats', _cache.cats).catch(() => {});
+        dbPut(STORE_META, 'dark', _cache.dark).catch(() => {});
+
+        console.log(`📦 IndexedDB 已載入：${_cache.notes.length} 則筆記, ${_cache.cats.length} 個類別`);
+        return true;
+      } catch (e) {
+        console.warn('⚠️ 載入失敗，使用 localStorage 備援:', e);
+        _cache.notes = JSON.parse(localStorage.getItem('multinotes') || '[]');
+        _cache.cats = JSON.parse(localStorage.getItem('multinotes_cats') || '["日常","電腦","AI"]');
+        _cache.dark = localStorage.getItem('multinotes_dark') === 'true';
+        return false;
+      }
     }
 
     // ============================================================
-    //  三、主題切換
+    //  二、主題切換
     // ============================================================
 
     function initTheme() {
-      const dark = localStorage.getItem('multinotes_dark') === 'true';
+      const dark = loadTheme();
       document.documentElement.classList.toggle('dark', dark);
       renderThemeBtn(dark);
     }
@@ -596,7 +752,7 @@
     function toggleTheme() {
       const dark = !document.documentElement.classList.contains('dark');
       document.documentElement.classList.toggle('dark', dark);
-      localStorage.setItem('multinotes_dark', dark);
+      saveTheme(dark);
       renderThemeBtn(dark);
     }
 
@@ -757,7 +913,7 @@
     function debugData() {
       const notes = loadNotes();
       const cats = loadCategories();
-      const dark = localStorage.getItem('multinotes_dark');
+      const dark = loadTheme();
       console.log(`📝 筆記本狀態：${notes.length} 則筆記, ${cats.length} 個類別, 夜間模式=${dark}`);
       if (notes.length > 0) {
         console.log('📋 筆記列表：', notes.map(n => ({ id: n.id, title: n.title, cat: n.category })));
@@ -1034,11 +1190,22 @@
     //  八、啟動
     // ============================================================
 
-    initTheme();
-    renderCategories();
-    renderNotes();
-    updateDebugBar();
-    const initState = debugData();
+    // 非同步啟動：先載入 IndexedDB / localStorage，再初始化 UI
+    initData().then(() => {
+      initTheme();
+      renderCategories();
+      renderNotes();
+      updateDebugBar();
+      debugData();
+      console.log('🚀 多功能筆記本啟動完畢');
+    }).catch(e => {
+      console.error('啟動失敗:', e);
+      // 緊急降級：用 localStorage
+      initTheme();
+      renderCategories();
+      renderNotes();
+      updateDebugBar();
+    });
 
     // Ctrl+N 快速新增
     document.addEventListener('keydown', e => {
