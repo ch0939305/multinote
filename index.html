@@ -1189,7 +1189,8 @@
             await backUpdateNote(editingId, { title, content, category });
             showToast('✅ 筆記已更新');
           } else {
-            await backAddNote({ title, content, category });
+            const now = nowStr();
+            await backAddNote({ id: uid(), title, content, category, created_at: now, updated_at: now });
             showToast('✅ 筆記已新增');
           }
         } catch (e) {
