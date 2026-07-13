@@ -6,6 +6,8 @@
   <title>多功能筆記本</title>
   <!-- Font Awesome 圖標庫 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Supabase JS 客戶端（後端模式用） -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2
   <style>
     /* ===== CSS 變數：日夜主題核心 ===== */
     :root {
@@ -471,10 +473,12 @@
     <div class="modal">
       <h2>🔗 後端連線設定</h2>
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
-        輸入後端 API 網址（含 /api），留空 = 使用本機儲存
+        輸入後端 API 網址。如果是 Supabase，下面也要填 anon key。留空 = 使用本機儲存
       </p>
       <label for="backendUrlInput">API 網址</label>
-      <input type="url" id="backendUrlInput" placeholder="http://localhost:3000/api" value="" />
+      <input type="url" id="backendUrlInput" placeholder="https://xxx.supabase.co" value="" />
+      <label for="backendKeyInput">Supabase anon key（非 Supabase 可不填）</label>
+      <input type="text" id="backendKeyInput" placeholder="eyJhbGciOiJIUzI1NiIs..." value="" style="font-size:12px" />
       <div class="modal-actions">
         <button class="btn-cancel" id="backendCancelBtn">取消</button>
         <button class="btn-save" id="backendSaveBtn">套用</button>
@@ -573,12 +577,56 @@
       return res.json();
     }
 
+    // ─── Supabase 客戶端 ───
+    let _supabase = null;
+    let _isSupabaseMode = false;
+
+    function initSupabase() {
+      if (!isBackendMode()) return;
+      const url = API_BASE;
+      // 如果網址包含 supabase.co，用 Supabase SDK
+      if (url.includes('supabase.co')) {
+        const key = localStorage.getItem('multinote_supabase_key');
+        if (key && key.length > 20) {
+          try {
+            _supabase = supabase.createClient(url, key);
+            _isSupabaseMode = true;
+            console.log('🚀 Supabase 客戶端初始化成功');
+          } catch (e) {
+            console.error('Supabase 初始化失敗:', e);
+            _isSupabaseMode = false;
+          }
+        } else {
+          console.warn('⚠️ 需要設定 Supabase anon key');
+          _isSupabaseMode = false;
+        }
+      } else {
+        _isSupabaseMode = false;
+      }
+    }
+
     // ─── 後端資料操作 ───
     let _backNotes = [];
     let _backCats = [];
 
     async function backLoadAll() {
       if (!isBackendMode()) return;
+      if (_isSupabaseMode) {
+        try {
+          const { data: notes, error: err1 } = await _supabase.from('notes').select('*').order('updated_at', { ascending: false });
+          if (err1) throw err1;
+          const { data: cats, error: err2 } = await _supabase.from('categories').select('name');
+          if (err2) throw err2;
+          _backNotes = notes || [];
+          _backCats = (cats || []).map(c => c.name);
+          console.log(`☁️ Supabase 已載入 ${_backNotes.length} 則筆記`);
+        } catch (e) {
+          console.warn('⚠️ Supabase 載入失敗:', e.message);
+          showToast('⚠️ 無法連線資料庫：' + e.message);
+        }
+        return;
+      }
+      // 客製後端
       try {
         const [notes, cats] = await Promise.all([
           apiFetch('GET', '/notes'),
@@ -714,13 +762,59 @@
     }
 
     // ─── 後端模式專用：單筆 CRUD ───
+    // ─── Supabase 專用：插入/更新/刪除筆記 ───
+    async function supAddNote(note) {
+      const { data, error } = await _supabase.from('notes').insert([note]).select();
+      if (error) throw error;
+      if (data && data.length > 0) {
+        _backNotes.unshift(data[0]);
+        return data[0];
+      }
+      return note;
+    }
+
+    async function supUpdateNote(id, updates) {
+      const now = nowStr();
+      const { data, error } = await _supabase.from('notes').update({ ...updates, updated_at: now }).eq('id', id).select();
+      if (error) throw error;
+      const idx = _backNotes.findIndex(n => n.id === id);
+      if (idx !== -1 && data && data.length > 0) _backNotes[idx] = data[0];
+      return data && data[0];
+    }
+
+    async function supDeleteNote(id) {
+      const { error } = await _supabase.from('notes').delete().eq('id', id);
+      if (error) throw error;
+      _backNotes = _backNotes.filter(n => n.id !== id);
+    }
+
+    async function supAddCategory(name) {
+      const { error } = await _supabase.from('categories').insert([{ name }]);
+      if (error) throw error;
+      _backCats.push(name);
+    }
+
+    async function supDeleteCategory(name) {
+      const other = _backCats.find(c => c !== name);
+      if (other) {
+        const { error: updateErr } = await _supabase.from('notes').update({ category: other }).eq('category', name);
+        if (updateErr) throw updateErr;
+        _backNotes.forEach(n => { if (n.category === name) n.category = other; });
+      }
+      const { error: delErr } = await _supabase.from('categories').delete().eq('name', name);
+      if (delErr) throw delErr;
+      _backCats = _backCats.filter(c => c !== name);
+    }
+
     async function backAddNote(note) {
+      if (_isSupabaseMode) return supAddNote(note);
       const saved = await apiFetch('POST', '/notes', note);
       _backNotes.push(saved);
       return saved;
     }
 
     async function backUpdateNote(id, updates) {
+      if (_isSupabaseMode) return supUpdateNote(id, updates);
       const saved = await apiFetch('PUT', `/notes/${id}`, updates);
       const idx = _backNotes.findIndex(n => n.id === id);
       if (idx !== -1) _backNotes[idx] = saved;
@@ -728,6 +822,7 @@
     }
 
     async function backDeleteNote(id) {
+      if (_isSupabaseMode) return supDeleteNote(id);
       await apiFetch('DELETE', `/notes/${id}`);
       _backNotes = _backNotes.filter(n => n.id !== id);
     }
@@ -759,12 +854,13 @@
     }
 
     async function backAddCategory(name) {
+      if (_isSupabaseMode) return supAddCategory(name);
       await apiFetch('POST', '/categories', { name });
       _backCats.push(name);
     }
 
     async function backDeleteCategory(name) {
-      // 重新分配筆記類別
+      if (_isSupabaseMode) return supDeleteCategory(name);
       const other = _backCats.find(c => c !== name);
       if (other) {
         _backNotes.forEach(n => {
@@ -1269,16 +1365,20 @@
     // 後端設定
     $('backendConfigBtn').addEventListener('click', () => {
       $('backendUrlInput').value = localStorage.getItem('multinote_api_url') || '';
+      $('backendKeyInput').value = localStorage.getItem('multinote_supabase_key') || '';
       $('backendModal').classList.add('open');
     });
     $('backendCancelBtn').addEventListener('click', () => $('backendModal').classList.remove('open'));
     $('backendSaveBtn').addEventListener('click', () => {
       const url = $('backendUrlInput').value.trim();
+      const key = $('backendKeyInput').value.trim();
       if (url) {
         localStorage.setItem('multinote_api_url', url);
-        showToast('✅ 後端網址已設定，請重新整理頁面');
+        if (key) localStorage.setItem('multinote_supabase_key', key);
+        showToast('✅ 後端設定已儲存，請重新整理頁面');
       } else {
         localStorage.removeItem('multinote_api_url');
+        localStorage.removeItem('multinote_supabase_key');
         showToast('🔄 已切換為本機模式，請重新整理頁面');
       }
       $('backendModal').classList.remove('open');
@@ -1366,6 +1466,7 @@
       console.log('🚀 多功能筆記本啟動完畢');
     };
 
+    initSupabase();
     if (isBackendMode()) {
       backLoadAll().then(startApp).catch(startApp);
     } else {
