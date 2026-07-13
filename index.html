@@ -564,7 +564,7 @@
     // ============================================================
     // 預設使用 Supabase 雲端資料庫
     // 如果不想用雲端，按 🔗 清空設定即可切回本機模式
-    const SUPABASE_URL = 'https://pavndetdbxytcegitvfx.supabase.co';
+    const SUPABASE_URL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
 
     // ─── 清除可能殘留的錯誤設定 ───
@@ -589,8 +589,8 @@
 
     // ─── Supabase 客戶端（直接 REST API，不用 SDK） ───
     let _isSupabaseMode = false;
-    let _supaUrl = '';
-    let _supaKey = '';
+    let _supaUrl = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
+    let _supaKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
 
     function initSupabase() {
       if (!isBackendMode()) return;
@@ -614,13 +614,13 @@
     async function supaFetch(method, table, options = {}) {
       const { params, body, select } = options;
       let url = `${_supaUrl}/rest/v1/${table}`;
-      if (params) url += '?' + params;
+      if (params) url += 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ' + params;
       const headers = {
         'apikey': _supaKey,
         'Authorization': `Bearer ${_supaKey}`,
         'Content-Type': 'application/json',
       };
-      if (select) headers['Prefer'] = 'return=representation';
+      if (select) headers['Prefer'] = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
       const opts = { method, headers };
       if (body) opts.body = JSON.stringify(body);
       const res = await fetch(url, opts);
@@ -628,7 +628,7 @@
         const text = await res.text();
         throw new Error(`Supabase ${method} ${table}: ${res.status} ${text.slice(0,100)}`);
       }
-      if (method === 'DELETE') return null;
+      if (method === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ') return null;
       return res.json();
     }
 
@@ -672,10 +672,10 @@
     // IndexedDB 跨 session 持久保存，容量更大更可靠
     // ============================================================
 
-    const DB_NAME = 'MultinoteDB';
+    const DB_NAME = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
     const DB_VER = 1;
-    const STORE_NOTES = 'notes';
-    const STORE_META = 'meta';
+    const STORE_NOTES = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
+    const STORE_META = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
 
     /** 記憶體快取（讓 sync API 順暢運作） */
     let _cache = { notes: [], cats: ['日常', '電腦', 'AI'], dark: false };
@@ -945,7 +945,7 @@
           }
         }
 
-        _cache.dark = idbDark === true || localStorage.getItem('multinotes_dark') === 'true';
+        _cache.dark = idbDark === true || localStorage.getItem('multinotes_dark') === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
 
         // 同步：把快取寫回兩種儲存
         try { localStorage.setItem('multinotes', JSON.stringify(_cache.notes)); } catch {}
@@ -961,7 +961,7 @@
         console.warn('⚠️ 載入失敗，使用 localStorage 備援:', e);
         _cache.notes = JSON.parse(localStorage.getItem('multinotes') || '[]');
         _cache.cats = JSON.parse(localStorage.getItem('multinotes_cats') || '["日常","電腦","AI"]');
-        _cache.dark = localStorage.getItem('multinotes_dark') === 'true';
+        _cache.dark = localStorage.getItem('multinotes_dark') === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
         return false;
       }
     }
@@ -994,8 +994,8 @@
     //  四、UI 渲染
     // ============================================================
 
-    let currentFilter = '全部';   // 當前選中的類別
-    let searchQuery = '';
+    let currentFilter = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';   // 當前選中的類別
+    let searchQuery = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
     let editingId = null;         // null = 新增模式, string = 編輯模式
 
     const $ = id => document.getElementById(id);
@@ -1023,7 +1023,7 @@
       const cats = loadCategories();
       // 類別按鈕
       catGroup.innerHTML = `
-        <button class="cat-btn ${currentFilter === '全部' ? 'active' : ''}" data-cat="全部">全部</button>
+        <button class="cat-btn ${currentFilter === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ' ? 'active' : ''}" data-cat="全部">全部</button>
         ${cats.map(c => `
           <button class="cat-btn ${currentFilter === c ? 'active' : ''}" data-cat="${c.replace(/"/g, '&quot;')}">${c}</button>
         `).join('')}
@@ -1069,7 +1069,7 @@
 
       // 過濾：類別 + 搜尋
       let filtered = notes;
-      if (currentFilter !== '全部') {
+      if (currentFilter !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ') {
         filtered = filtered.filter(n => n.category === currentFilter);
       }
       if (searchQuery.trim()) {
@@ -1083,7 +1083,7 @@
       filtered.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
       // 統計
-      stats.textContent = `共 ${filtered.length} 則筆記${currentFilter !== '全部' ? `（${currentFilter}）` : ''}`;
+      stats.textContent = `共 ${filtered.length} 則筆記${currentFilter !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ' ? `（${currentFilter}）` : ''}`;
       updateDebugBar();
 
       if (filtered.length === 0) {
@@ -1158,10 +1158,10 @@
     /** 開啟新增 Modal */
     function openAddModal() {
       editingId = null;
-      modalTitle.textContent = '新增筆記';
-      noteTitle.value = '';
-      noteCategory.value = currentFilter !== '全部' ? currentFilter : (loadCategories()[0] || '日常');
-      noteContent.value = '';
+      modalTitle.textContent = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
+      noteTitle.value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
+      noteCategory.value = currentFilter !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ' ? currentFilter : (loadCategories()[0] || '日常');
+      noteContent.value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
       modalOverlay.classList.add('open');
       noteTitle.focus();
     }
@@ -1172,7 +1172,7 @@
       const note = notes.find(n => n.id === id);
       if (!note) return;
       editingId = id;
-      modalTitle.textContent = '編輯筆記';
+      modalTitle.textContent = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
       noteTitle.value = note.title;
       noteCategory.value = note.category;
       noteContent.value = note.content;
@@ -1293,7 +1293,7 @@
         saveCategories(cats);
       }
       renderCategories();
-      $('newCatInput').value = '';
+      $('newCatInput').value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
       showToast('✅ 類別已新增');
     }
 
@@ -1325,7 +1325,7 @@
       if (changed) saveNotes(notes);
       cats = cats.filter(c => c !== name);
       saveCategories(cats);
-      if (currentFilter === name) currentFilter = '全部';
+      if (currentFilter === name) currentFilter = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
       renderCategories();
       renderNotes();
       updateDebugBar();
@@ -1393,7 +1393,7 @@
       if (this.files && this.files[0]) {
         importData(this.files[0]);
       }
-      this.value = '';
+      this.value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
     });
 
     // 後端設定
@@ -1430,7 +1430,7 @@
       addCategory($('newCatInput').value);
     });
     $('newCatInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') addCategory(e.target.value);
+      if (e.key === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ') addCategory(e.target.value);
     });
 
     // 搜尋
@@ -1445,7 +1445,7 @@
 
     // 按 Escape 關閉 Modal
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ') closeModal();
     });
 
     // 點擊 Modal 外部關閉
@@ -1512,7 +1512,7 @@
 
     // Ctrl+N 快速新增
     document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ') {
         e.preventDefault();
         openAddModal();
       }
