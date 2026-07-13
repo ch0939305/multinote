@@ -564,7 +564,11 @@
     const SUPABASE_URL = 'https://pavndetdbxytcegitvfx.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
 
-    // 🔒 固定使用 Supabase 雲端，不使用 localStorage（避免錯誤設定）
+    // ─── 清除可能殘留的錯誤設定 ───
+    localStorage.removeItem('multinote_api_url');
+    localStorage.removeItem('multinote_supabase_key');
+
+    // 🔒 固定使用 Supabase 雲端
     const API_BASE = SUPABASE_URL;
 
     function isBackendMode() { return true; }
