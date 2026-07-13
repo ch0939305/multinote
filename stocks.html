@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>📊 股價儀表板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Noto Sans TC,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:18px 16px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #30363d;position:sticky;top:0;z-index:10}
+.header h1{font-size:20px;display:flex;align-items:center;gap:6px}
+.header .time{font-size:12px;color:#8b949e}
+.stats{font-size:12px;color:#8b949e;padding:10px 16px 6px}
+.grid{padding:0 12px 20px;display:flex;flex-direction:column;gap:8px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .2s}
+.card:active{transform:scale(.98);border-color:#58a6ff}
+.card-row{display:flex;justify-content:space-between;align-items:center}
+.card-left{flex:1}
+.card-name{font-size:17px;font-weight:600}
+.card-symbol{font-size:12px;color:#8b949e;margin-top:1px}
+.card-price{font-size:26px;font-weight:700;text-align:right}
+.card-kd-row{display:flex;gap:12px;margin-top:6px;font-size:13px;color:#8b949e}
+.card-kd-row span{display:flex;align-items:center;gap:3px}
+.kd-up{color:#f85149}
+.kd-down{color:#3fb950}
+.kd-flat{color:#8b949e}
+.badge{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-bull{background:#1b3a1b;color:#3fb950}
+.badge-bear{background:#3a1b1b;color:#f85149}
+.spread-val{color:#d2a8ff}
+.loading{text-align:center;padding:60px 20px;color:#8b949e}
+.error{text-align:center;padding:60px 20px;color:#f85149}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>📊 股價儀表板</h1>
+  <div class="time" id="updateTime">載入中...</div>
+</div>
+<div class="stats" id="statsBar"></div>
+<div class="grid" id="stockGrid"></div>
+
+<script>
+const SUPABASE_URL = 'https://pavndetdbxytcegitvfx.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhdm5kZXRkYnh5dGNlZ2l0dmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5Mjk4NDMsImV4cCI6MjA5OTUwNTg0M30.W0nRosd8aY8PU-RL1_IO0rrMLP4PgTFg36lUKgCBAUQ';
+
+async function api(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` }
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
+// 取得每檔股票最新一筆資料
+async function loadLatest() {
+  // 1. 先取得所有股票的 symbol + name
+  const stocks = await api('stocks?select=symbol,name&order=date.desc&limit=100');
+  const seen = new Set();
+  const unique = [];
+  for (const s of stocks) {
+    if (!seen.has(s.symbol)) { seen.add(s.symbol); unique.push(s); }
+  }
+  
+  // 2. 取每檔最新資料
+  const rows = [];
+  for (const s of unique) {
+    const data = await api(`stocks?symbol=eq.${s.symbol}&order=date.desc&limit=2`);
+    if (data.length === 0) continue;
+    const latest = data[0];
+    const prev = data.length > 1 ? data[1] : null;
+    rows.push({ stock: s, latest, prev });
+  }
+  
+  // 排序：台積電排第一個，其他照字母
+  rows.sort((a, b) => {
+    if (a.stock.symbol === '2330.TW') return -1;
+    if (b.stock.symbol === '2330.TW') return 1;
+    return a.stock.name.localeCompare(b.stock.name, 'zh');
+  });
+  
+  return rows;
+}
+
+function render(rows) {
+  const grid = document.getElementById('stockGrid');
+  const ts = document.getElementById('updateTime');
+  const stats = document.getElementById('statsBar');
+  
+  const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+  ts.textContent = now;
+  stats.textContent = `${rows.length} 檔股票`;
+  
+  grid.innerHTML = rows.map(({ stock, latest, prev }) => {
+    const kd = latest.kd;
+    const prevKd = prev ? prev.kd : null;
+    const close = latest.close;
+    const spread = latest.spread_8d;
+    const bb = latest.bull_bear;
+    
+    // KD 趨勢
+    let kdClass = 'kd-flat';
+    let kdArrow = '→';
+    if (prevKd !== null) {
+      if (kd > prevKd) { kdClass = 'kd-up'; kdArrow = '↑'; }
+      else if (kd < prevKd) { kdClass = 'kd-down'; kdArrow = '↓'; }
+    }
+    
+    // 多空標籤
+    const badgeClass = (bb !== null && bb > 0) ? 'badge-bull' : 'badge-bear';
+    const badgeText = (bb !== null && bb > 0) ? '多' : '空';
+    
+    return `
+      <div class="card" onclick="showDetail('${stock.symbol}')">
+        <div class="card-row">
+          <div class="card-left">
+            <div class="card-name">${stock.name}</div>
+            <div class="card-symbol">${stock.symbol}</div>
+          </div>
+          <div class="card-price">${close ? close.toFixed(2) : '—'}</div>
+        </div>
+        <div class="card-kd-row">
+          <span class="${kdClass}">KD ${kdArrow} ${kd !== null ? kd.toFixed(1) : '—'}</span>
+          <span>前 ${prevKd !== null ? prevKd.toFixed(1) : '—'}</span>
+          <span class="spread-val">8日價差 ${spread !== null ? spread.toFixed(2) : '—'}</span>
+          <span><span class="badge ${badgeClass}">${badgeText}</span></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function showDetail(symbol) {
+  alert(`點擊 ${symbol} — 詳細歷史資料頁面開發中\n敬請期待 📈`);
+}
+
+(async function() {
+  try {
+    const data = await loadLatest();
+    render(data);
+  } catch (e) {
+    document.getElementById('stockGrid').innerHTML = `<div class="error">⚠️ 載入失敗：${e.message}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
