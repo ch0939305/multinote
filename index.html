@@ -559,9 +559,12 @@
     // ============================================================
     //  後端連線設定（填 URL 即啟用 API 模式）
     // ============================================================
-    // 範例：const API_BASE = 'http://localhost:3000/api';
-    //       或 'https://notebook-api.railway.app/api'
-    const API_BASE = localStorage.getItem('multinote_api_url') || '';
+    // 預設使用 Supabase 雲端資料庫
+    // 如果不想用雲端，按 🔗 清空設定即可切回本機模式
+    const SUPABASE_URL = 'https://pavndetdbxytcegitvfx.supabase.co';
+    const SUPABASE_KEY = 'eyJhbG…BAUQ';
+
+    const API_BASE = localStorage.getItem('multinote_api_url') || SUPABASE_URL;
 
     function isBackendMode() { return API_BASE.length > 5; }
 
@@ -586,7 +589,7 @@
       const url = API_BASE;
       if (url.includes('supabase.co')) {
         _supaUrl = url;
-        _supaKey = localStorage.getItem('multinote_supabase_key') || '';
+        _supaKey = localStorage.getItem('multinote_supabase_key') || SUPABASE_KEY;
         if (_supaKey && _supaKey.length > 20) {
           _isSupabaseMode = true;
           console.log('🚀 Supabase REST 模式已啟用');
