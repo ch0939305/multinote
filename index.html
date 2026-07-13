@@ -786,13 +786,18 @@
     // ─── 後端模式專用：單筆 CRUD ───
     // ─── Supabase 專用：插入/更新/刪除筆記（使用 REST fetch） ───
     async function supAddNote(note) {
-      const data = await supaFetch('POST', 'notes', { body: note, select: true });
+      // 確保有 id（以防 uid() 出錯）
+      const safeNote = { ...note };
+      if (!safeNote.id || safeNote.id.length < 6) {
+        safeNote.id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      }
+      const data = await supaFetch('POST', 'notes', { body: safeNote, select: true });
       if (data && data.length > 0) {
         _backNotes.unshift(data[0]);
         return data[0];
       }
-      _backNotes.unshift(note);
-      return note;
+      _backNotes.unshift(safeNote);
+      return safeNote;
     }
 
     async function supUpdateNote(id, updates) {
@@ -851,9 +856,10 @@
       _backNotes = _backNotes.filter(n => n.id !== id);
     }
 
-    /** 產生短 UID (8 碼十六進位) */
+    /** 產生短 UID (12 碼英數混合) */
     function uid() {
-      return Math.random().toString(16).slice(2, 10);
+      // 用隨機 + 時間戳確保唯一
+      return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
     }
 
     /** 取得台灣時間字串 */
